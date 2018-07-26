@@ -1,6 +1,6 @@
 # Vowel Count
 
-Counts all vowels in specified text files using multithreading. Mutual exclusion is used to lock processing to avoid conflicts.
+Counts all vowels in text files that are given as input by the user using Multithreading, pthread.h library of the c++ is used for the implementation
 
 # Sleeping Barber
 
