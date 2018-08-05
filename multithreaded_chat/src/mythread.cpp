@@ -1,5 +1,4 @@
 #include "mythread.h"
-
 using namespace std;
 
 //Need to actually "allocate" static member
@@ -11,7 +10,6 @@ MyThread::MyThread() {
 int MyThread::Create(void *Callback, void *args) {
   int tret=0;
  
-  //Supercreepy typecast
   tret = pthread_create(&this->tid, NULL, (void *(*)(void *))Callback, args);
 
   if(tret) { 

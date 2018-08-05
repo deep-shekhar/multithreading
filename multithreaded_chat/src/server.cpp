@@ -1,19 +1,17 @@
 #include "server.h"
+#include <string>
 
 using namespace std;
 
-//Actually allocate clients
 vector<Client> Server::clients;
 
 Server::Server() {
 
-  //Initialize static mutex from MyThread
   MyThread::InitMutex();
 
   //For setsock opt (REUSEADDR)
   int yes = 1;
-
-  //Init serverSock and start listen()'ing
+  //creating socket with IPv4 TCP connection and IP protocol.
   serverSock = socket(AF_INET, SOCK_STREAM, 0);
   memset(&serverAddr, 0, sizeof(sockaddr_in));
   serverAddr.sin_family = AF_INET;
@@ -25,8 +23,9 @@ Server::Server() {
 
   if(bind(serverSock, (struct sockaddr *) &serverAddr, sizeof(sockaddr_in)) < 0)
     cerr << "Failed to bind";
-
-  listen(serverSock, 5);
+  
+  listen(serverSock, 6);
+  cout <<"listening"<<endl;
 }
 
 /*
@@ -42,25 +41,24 @@ void Server::AcceptAndDispatch() {
   MyThread *t;
 
   socklen_t cliSize = sizeof(sockaddr_in);
-
+  
   while(1) {
 
           c = new Client();
 	  t = new MyThread();
-
 	  //Blocks here;
           c->sock = accept(serverSock, (struct sockaddr *) &clientAddr, &cliSize);
-
+          cout <<c->sock<<" "<<c->name<<endl;
 	  if(c->sock < 0) {
 	    cerr << "Error on accept";
 	  }
 	  else {
-	    t->Create((void *) Server::HandleClient, c);
+	    t->Create((void *) Server::HandleClient,(void *) c);   //typecasting here
 	  }
   }
 }
 
-//Static
+
 void *Server::HandleClient(void *args) {
 
   //Pointer to accept()'ed Client
@@ -69,7 +67,6 @@ void *Server::HandleClient(void *args) {
   int index;
   int n;
 
-  //Add client in Static clients <vector> (Critical section!)
   MyThread::LockMutex((const char *) c->name);
   
     //Before adding the new client, calculate its id. (Now we have the lock)
@@ -84,10 +81,10 @@ void *Server::HandleClient(void *args) {
   while(1) {
     memset(buffer, 0, sizeof buffer);
     n = recv(c->sock, buffer, sizeof buffer, 0);
-
+    
     //Client disconnected?
     if(n == 0) {
-      cout << "Client " << c->name << " diconnected" << endl;
+  up: cout << "Client " << c->name << " diconnected" << endl;
       close(c->sock);
       
       //Remove client in Static clients <vector> (Critical section!)
@@ -107,9 +104,14 @@ void *Server::HandleClient(void *args) {
     }
     else {
       //Message received. Send to all clients.
-      snprintf(message, sizeof message, "<%s>: %s", c->name, buffer); 
-      cout << "Will send to all: " << message << endl;
-      Server::SendToAll(message);
+      snprintf(message, sizeof message, "<%s>: %s", c->name, buffer);
+      string tem(buffer,3);	
+      if(tem == "bye"){
+         Server::SendToAll(message,c->name); 
+         goto up;
+      }
+      cout << "Will send to all other: " << message << endl;
+      Server::SendToAll(message,c->name);
     }
   }
 
@@ -117,13 +119,16 @@ void *Server::HandleClient(void *args) {
   return NULL;
 }
 
-void Server::SendToAll(char *message) {
+void Server::SendToAll(char *message,char *cname) {
   int n;
 
   //Acquire the lock
   MyThread::LockMutex("'SendToAll()'");
  
     for(size_t i=0; i<clients.size(); i++) {
+      if(strcmp(clients[i].name,cname)==0){
+         continue;
+      }
       n = send(Server::clients[i].sock, message, strlen(message), 0);
       cout << n << " bytes sent." << endl;
     }
